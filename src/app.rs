@@ -1,3 +1,5 @@
+use std::time::Duration;
+use klib::core::base::{Playable, PlaybackHandle};
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -8,6 +10,9 @@ pub struct TemplateApp {
 
     #[serde(skip)] // This how you opt-out of serialization of a field
     value: f32,
+
+    #[serde(skip)]
+    playback_handle: Option<PlaybackHandle>,
 }
 
 impl Default for TemplateApp {
@@ -16,6 +21,7 @@ impl Default for TemplateApp {
             // Example stuff:
             label: "Hello World!".to_owned(),
             value: 2.7,
+            playback_handle: None,
         }
     }
 }
@@ -32,6 +38,7 @@ impl TemplateApp {
         style.text_styles.get_mut(&egui::TextStyle::Button).unwrap().size = FONT_SIZE;
         style.text_styles.get_mut(&egui::TextStyle::Body).unwrap().size = FONT_SIZE;
         style.spacing.button_padding = egui::Vec2::new(20.0, 20.0);
+        style.spacing.item_spacing = egui::Vec2::new(0.0, 0.0);
         ctx.set_style(style);
 
         // Load previous app state (if any).
@@ -44,11 +51,23 @@ impl TemplateApp {
         Default::default()
     }
 }
+// TODO: add a font
+// utf8 characters need special font support :(
+// Remove unicode accidentals from note name, and turn numbers into subscripts
+fn format_note_name(mut note: Note) -> String {
+    use klib::core::interval::Interval;
 
-fn subscript_num(n: usize) -> String {
+    // convert flats to sharps
+    let note_name = note.to_string();
+    if note_name.contains('♭') {
+        note = note + Interval::AugmentedSeventh - Interval::PerfectOctave;
+    }
+
     let mut s = String::new();
-    for c in n.to_string().chars() {
+    for c in note.to_string().chars() {
         s.push(match c {
+            '♯' => '#',
+            '♭' => 'b',
             '0' => '₀',
             '1' => '₁',
             '2' => '₂',
@@ -65,7 +84,46 @@ fn subscript_num(n: usize) -> String {
     s
 }
 
-const BUTTON_SIZE: [f32; 2] = [80.0, 40.0];
+const BUTTON_SIZE: [f32; 2] = [50.0, 25.0];
+const MAX_FRET: usize = 17;
+
+use klib::core::note::HasNoteId;
+use klib::core::note::Note;
+
+
+fn fret_string(string: Note, fret: usize, selected: bool, playback_handle: &mut Option<PlaybackHandle>) -> impl egui::Widget + '_ {
+    move |ui: &mut egui::Ui| {
+
+        let note_id = string.id() << fret;
+        let note = Note::from_id(note_id).unwrap();
+
+        let note_name = format_note_name(note);
+
+        let label = egui::SelectableLabel::new(selected, note_name);
+        let response = ui.add_sized(BUTTON_SIZE, label);
+        if response.clicked() {
+            let dur = Duration::from_millis(500);
+            // TODO: this crackles, just use the frequency and a different lib
+            // to play sound?
+            let ret =
+                note.play(Duration::from_millis(0),
+                           dur,
+                           Duration::from_millis(0));
+
+            match ret {
+                Ok(h) => {
+                    log::debug!("played note {}", note);
+                    // Have to keep the handle around to play the sound.
+                    *playback_handle = Some(h);
+                },
+                Err(e) => log::error!("error playing note: {}", e),
+            }
+        }
+
+        response
+    }
+
+}
 
 impl eframe::App for TemplateApp {
     /// Called by the frame work to save state before shutdown.
@@ -75,9 +133,6 @@ impl eframe::App for TemplateApp {
 
     /// Called each time the UI needs repainting, which may be many times per second.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
-        // For inspiration and more examples, go to https://emilk.github.io/egui
-
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
 
@@ -93,7 +148,7 @@ impl eframe::App for TemplateApp {
                     ui.add_space(16.0);
                 }
                 ui.menu_button("Settings", |ui| {
-                    // add a disabled button saying coming soon
+                    // TODO: add settings
                     ui.add_enabled(false, egui::Button::new("Coming soon"));
                 });
 
@@ -101,6 +156,7 @@ impl eframe::App for TemplateApp {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::RIGHT), |ui| {
                     egui::widgets::global_dark_light_mode_buttons(ui)
                 });
+
             });
         });
 
@@ -119,15 +175,17 @@ impl eframe::App for TemplateApp {
                     // Make a grid
                     egui::Grid::new("fretboard").show(ui, |ui| {
                         ui.style_mut().visuals.widgets.hovered.bg_fill = egui::Color32::DARK_GRAY;
-                        const STRING_OCTAVES: [usize; 6] = [2, 2, 3, 3, 3, 4];
 
-                        // utf8 characters need special font support :(
-                        // const NOTES: [&str; 12] = ["C", "C♯", "D", "D♯", "E", "F",
-                        //                            "F♯", "G", "G♯", "A", "A♯", "B"];
-                        const NOTES: [&str; 12] = ["C", "C#", "D", "D#", "E", "F",
-                                                   "F#", "G", "G#", "A", "A#", "B"];
-                        const STRINGS: [usize; 6] = [4, 11, 7, 2, 9, 4];
-                        const MAX_FRET: usize = 17;
+                        use klib::core::named_pitch::NamedPitch;
+                        use klib::core::octave::Octave;
+                        let tuning: [Note; 6] = [
+                            Note::new(NamedPitch::E, Octave::Four),
+                            Note::new(NamedPitch::B, Octave::Three),
+                            Note::new(NamedPitch::G, Octave::Three),
+                            Note::new(NamedPitch::D, Octave::Three),
+                            Note::new(NamedPitch::A, Octave::Two),
+                            Note::new(NamedPitch::E, Octave::Two),
+                        ];
 
                         // Add fretboard labels
                         for fret in 0..MAX_FRET {
@@ -139,6 +197,9 @@ impl eframe::App for TemplateApp {
                                 9 => "9",
                                 12 => "12",
                                 15 => "15",
+                                17 => "17",
+                                19 => "19",
+                                21 => "21",
                                 _ => "",
                             };
                             ui.add_sized(BUTTON_SIZE, egui::Label::new(fret_label));
@@ -153,18 +214,12 @@ impl eframe::App for TemplateApp {
                         ui.end_row();
 
                         // add a row of buttons for each of the 6 strings
-                        for string in 0..6 {
+                        for string in tuning {
                             for fret in 0..MAX_FRET {
-                                // a button for each note
-                                let note = (STRINGS[string] + fret) % 12;
-                                let note_name = NOTES[note];
-                                let octave = STRING_OCTAVES[string] + (fret / 12);
-                                // TODO: make this a custom widget
-                                let label = egui::SelectableLabel::new(false, note_name);
-                                if ui.add_sized(BUTTON_SIZE, label).clicked() {
-                                    let octave_subscript = subscript_num(octave);
-                                    log::debug!("{}{}", note_name, octave_subscript);
-                                };
+                                ui.add(fret_string(string.clone(),
+                                                   fret,
+                                                   false,
+                                                   &mut self.playback_handle));
                             }
                             ui.end_row();
                         }
@@ -201,4 +256,15 @@ fn powered_by_egui_and_eframe(ui: &mut egui::Ui) {
         );
         ui.label(".");
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use klib::core::note::*;
+    use klib::core::interval::Interval;
+
+    #[test]
+    fn test_turning_flat_to_sharps() {
+        assert_eq!(GFlat + Interval::AugmentedSeventh - Interval::PerfectOctave, FSharp);
+    }
 }
