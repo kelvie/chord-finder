@@ -37,7 +37,6 @@ impl TemplateApp {
         let mut style = (*ctx.style()).clone();
         style.text_styles.get_mut(&egui::TextStyle::Button).unwrap().size = FONT_SIZE;
         style.text_styles.get_mut(&egui::TextStyle::Body).unwrap().size = FONT_SIZE;
-        style.spacing.button_padding = egui::Vec2::new(20.0, 20.0);
         style.spacing.item_spacing = egui::Vec2::new(0.0, 0.0);
         ctx.set_style(style);
 
@@ -67,9 +66,8 @@ impl TemplateApp {
         Default::default()
     }
 }
-// TODO: add a font
-// utf8 characters need special font support :(
-// Remove unicode accidentals from note name, and turn numbers into subscripts
+
+// Format a note for printing
 fn format_note_name(mut note: Note) -> String {
     use klib::core::interval::Interval;
 
@@ -79,6 +77,7 @@ fn format_note_name(mut note: Note) -> String {
         note = note + Interval::AugmentedSeventh - Interval::PerfectOctave;
     }
 
+    // Turn octave (well all numbers) into subscripts
     let mut s = String::new();
     for c in note.to_string().chars() {
         s.push(match c {
@@ -98,7 +97,8 @@ fn format_note_name(mut note: Note) -> String {
     s
 }
 
-const BUTTON_SIZE: [f32; 2] = [50.0, 25.0];
+const BUTTON_HEIGHT: f32 = 60.0;
+const BUTTON_SIZE: [f32; 2] = [BUTTON_HEIGHT, BUTTON_HEIGHT];
 const MAX_FRET: usize = 17;
 
 use klib::core::note::HasNoteId;
@@ -112,30 +112,39 @@ fn note_for_fret(string: Note, fret: usize) -> Note {
 fn note_button(note: Note, selected: bool, playback_handle: &mut Option<PlaybackHandle>) -> impl egui::Widget + '_ {
     move |ui: &mut egui::Ui| {
 
-        let note_name = format_note_name(note);
-
-        let label = egui::SelectableLabel::new(selected, note_name);
-        let response = ui.add_sized(BUTTON_SIZE, label);
-        if response.clicked() {
-            let dur = Duration::from_millis(500);
-            // TODO: this crackles, just use the frequency and a different lib
-            // to play sound?
-            let ret =
-                note.play(Duration::from_millis(0),
-                           dur,
-                           Duration::from_millis(0));
-
-            match ret {
-                Ok(h) => {
-                    log::debug!("played note {}", note);
-                    // Have to keep the handle around to play the sound.
-                    *playback_handle = Some(h);
-                },
-                Err(e) => log::error!("error playing note: {}", e),
+        // TODO: this scope messes up the alignment for some reason
+        ui.scope(|ui| {
+            // change style for just this widget
+            if !ui.is_enabled() {
+                // Change the foreground color when inactive to be the same as the bg_stroke
+                let style = ui.style_mut();
+                style.visuals.widgets.inactive.fg_stroke.color = style.visuals.widgets.inactive.bg_stroke.color;
             }
-        }
+            let note_name = format_note_name(note);
 
-        response
+            let label = egui::SelectableLabel::new(selected, note_name);
+            let response = ui.add_sized(BUTTON_SIZE, label);
+            if response.clicked() {
+                let dur = Duration::from_millis(500);
+                // TODO: this crackles, just use the frequency and a different lib
+                // to play sound?
+                let ret =
+                    note.play(Duration::from_millis(0),
+                              dur,
+                              Duration::from_millis(0));
+
+                match ret {
+                    Ok(h) => {
+                        log::debug!("played note {}", note);
+                        // Have to keep the handle around to play the sound.
+                        *playback_handle = Some(h);
+                    },
+                    Err(e) => log::error!("error playing note: {}", e),
+                }
+            }
+
+            response
+        }).response
     }
 
 }
@@ -176,12 +185,17 @@ impl eframe::App for TemplateApp {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
+            // store chord pitches (need HasPitch to convert Note to Pitch)
+            use klib::core::pitch::Pitch;
+            use klib::core::pitch::HasPitch;
+            let mut chord_pitches: Vec<Pitch> = Vec::new();
 
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
+                ui.label("Chord name: ");
+                ui.add_sized([100.0, 0.0], egui::TextEdit::singleline(&mut self.chord));
+            });
             // Add a text field for the user to enter a chord name
             egui::Grid::new("chord_id").show(ui, |ui| {
-                ui.label("Chord name: ");
-                ui.add_sized([100.0, 20.0], egui::TextEdit::singleline(&mut self.chord));
-
                 use klib::core::chord::Chord;
                 use klib::core::base::Parsable;
                 use klib::core::chord::HasChord;
@@ -193,10 +207,11 @@ impl eframe::App for TemplateApp {
                         chord.chord()
                              .iter()
                              .for_each(|note| {
-                                 // TODO: figure out why this is so misaligned
                                  ui.add(note_button(
                                      *note, false, &mut self.playback_handle)
                                  );
+                                 // store pitch
+                                 chord_pitches.push(note.pitch());
                              });
 
                     },
@@ -263,9 +278,11 @@ impl eframe::App for TemplateApp {
                         // add a row of buttons for each of the 6 strings
                         for string in tuning {
                             for fret in 0..MAX_FRET {
-                                ui.add(note_button(note_for_fret(string.clone(), fret),
-                                                   false,
-                                                   &mut self.playback_handle));
+                                // enable only if chord pitches are empty or note is in the chord
+                                let fret_note = note_for_fret(string.clone(), fret);
+                                let enabled = chord_pitches.is_empty() ||
+                                    chord_pitches.contains(&fret_note.pitch());
+                                ui.add_enabled(enabled, note_button(fret_note, false, &mut self.playback_handle));
                             }
                             ui.end_row();
                         }
