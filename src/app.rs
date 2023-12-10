@@ -5,23 +5,23 @@ use klib::core::base::{Playable, PlaybackHandle};
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct TemplateApp {
-    // Example stuff:
     chord: String,
 
-    #[serde(skip)] // This how you opt-out of serialization of a field
-    value: f32,
+    // Used as an LRU cache for the last played note -- the handles need to
+    // exist for the sound to continue playing.
+    #[serde(skip)]
+    playback_handles: Vec<PlaybackHandle>,
 
     #[serde(skip)]
-    playback_handle: Option<PlaybackHandle>,
+    selection: Vec<Note>,
 }
 
 impl Default for TemplateApp {
     fn default() -> Self {
         Self {
-            // Example stuff:
             chord: "C".to_owned(),
-            value: 2.7,
-            playback_handle: None,
+            playback_handles: Vec::new(),
+            selection: Vec::new(),
         }
     }
 }
@@ -109,7 +109,18 @@ fn note_for_fret(string: Note, fret: usize) -> Note {
     Note::from_id(note_id).unwrap()
 }
 
-fn note_button(note: Note, selected: bool, playback_handle: &mut Option<PlaybackHandle>) -> impl egui::Widget + '_ {
+fn playback_handle_add(handle: PlaybackHandle, handles: &mut
+                       Vec<PlaybackHandle>) {
+    const MAX_HANDLES: usize = 50;
+    if handles.len() >= MAX_HANDLES {
+        // remove the oldest handle
+        handles.remove(0);
+    }
+    handles.push(handle);
+}
+
+fn note_button(note: Note, selected: bool,
+               playback_handles: &mut Vec<PlaybackHandle>) -> impl egui::Widget + '_ {
     move |ui: &mut egui::Ui| {
 
         // Scope is in case we want to do style changes for this button
@@ -136,7 +147,7 @@ fn note_button(note: Note, selected: bool, playback_handle: &mut Option<Playback
                     Ok(h) => {
                         log::debug!("played note {}", note);
                         // Have to keep the handle around to play the sound.
-                        *playback_handle = Some(h);
+                        playback_handle_add(h, playback_handles);
                     },
                     Err(e) => log::error!("error playing note: {}", e),
                 }
@@ -214,7 +225,7 @@ impl eframe::App for TemplateApp {
                              .iter()
                              .for_each(|note| {
                                  ui.add(note_button(
-                                     *note, false, &mut self.playback_handle)
+                                     *note, false, &mut self.playback_handles)
                                  );
                                  // store pitch
                                  chord_pitches.push(note.pitch());
@@ -288,7 +299,7 @@ impl eframe::App for TemplateApp {
                                 let fret_note = note_for_fret(string.clone(), fret);
                                 let enabled = chord_pitches.is_empty() ||
                                     chord_pitches.contains(&fret_note.pitch());
-                                ui.add_enabled(enabled, note_button(fret_note, false, &mut self.playback_handle));
+                                ui.add_enabled(enabled, note_button(fret_note, false, &mut self.playback_handles));
                             }
                             ui.end_row();
                         }
