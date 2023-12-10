@@ -112,15 +112,14 @@ fn note_for_fret(string: Note, fret: usize) -> Note {
 fn note_button(note: Note, selected: bool, playback_handle: &mut Option<PlaybackHandle>) -> impl egui::Widget + '_ {
     move |ui: &mut egui::Ui| {
 
-        // TODO: this scope messes up the alignment for some reason
+        // Scope is in case we want to do style changes for this button
+        // specifically, e.g. to set something different if this button is
+        // disabled.
         ui.scope(|ui| {
-            // change style for just this widget
-            if !ui.is_enabled() {
-                // Change the foreground color when inactive to be the same as the bg_stroke
-                let style = ui.style_mut();
-                style.visuals.widgets.inactive.fg_stroke.color = style.visuals.widgets.inactive.bg_stroke.color;
-            }
-            let note_name = format_note_name(note);
+            let note_name = match ui.is_enabled() {
+                true => format_note_name(note),
+                false => "|".to_owned(),
+            };
 
             let label = egui::SelectableLabel::new(selected, note_name);
             let response = ui.add_sized(BUTTON_SIZE, label);
@@ -190,10 +189,17 @@ impl eframe::App for TemplateApp {
             use klib::core::pitch::HasPitch;
             let mut chord_pitches: Vec<Pitch> = Vec::new();
 
-            ui.with_layout(egui::Layout::left_to_right(egui::Align::TOP), |ui| {
-                ui.label("Chord name: ");
-                ui.add_sized([100.0, 0.0], egui::TextEdit::singleline(&mut self.chord));
-            });
+            ui.label("Chord name");
+            ui.add_space(10.0);
+            if ui.add_sized([100.0, 0.0], egui::TextEdit::singleline(&mut self.chord)).changed() {
+                // if chord starts with a-g
+                if let Some(c) = self.chord.chars().next() {
+                    if let 'a'..='g' = c {
+                        self.chord = format!("{}{}", c.to_ascii_uppercase(), &self.chord[1..]);
+                    }
+                }
+            }
+
             // Add a text field for the user to enter a chord name
             egui::Grid::new("chord_id").show(ui, |ui| {
                 use klib::core::chord::Chord;
