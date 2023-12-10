@@ -224,7 +224,8 @@ impl eframe::App for TemplateApp {
                 }
             });
 
-            // TODO center the heading with the fretboard (or what's visible of it)
+            // TODO center the heading with the fretboard (or what's visible of
+            // it). Or just make this look nicer.
             ui.heading("Fretboard");
 
             ui.add_space(20.0);
@@ -233,7 +234,6 @@ impl eframe::App for TemplateApp {
                 ui.add_space(30.0);
 
                 egui::ScrollArea::horizontal().show(ui, |ui| {
-                    // Make a grid
                     // TODO: transpose using ui.max_rect() if it's vertical
                     egui::Grid::new("fretboard").show(ui, |ui| {
                         ui.style_mut().visuals.widgets.hovered.bg_fill = egui::Color32::DARK_GRAY;
