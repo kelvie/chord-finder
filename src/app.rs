@@ -68,18 +68,21 @@ impl TemplateApp {
 }
 
 // Format a note for printing
-fn format_note_name(mut note: Note) -> String {
+fn format_note_name(note: Note) -> String {
     use klib::core::interval::Interval;
+    use klib::core::note::ToUniversal;
 
+    // Get universal note, which may be flat, but never sharp (or double flat/sharp)
+    let mut unote = note.to_universal();
+    let note_name = unote.to_string();
     // convert flats to sharps
-    let note_name = note.to_string();
     if note_name.contains('♭') {
-        note = note + Interval::AugmentedSeventh - Interval::PerfectOctave;
+        unote = unote + Interval::AugmentedSeventh - Interval::PerfectOctave;
     }
 
     // Turn octave (well all numbers) into subscripts
     let mut s = String::new();
-    for c in note.to_string().chars() {
+    for c in unote.to_string().chars() {
         s.push(match c {
             '0' => '₀',
             '1' => '₁',
