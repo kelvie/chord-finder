@@ -282,7 +282,7 @@ impl eframe::App for TemplateApp {
                             21 => "21",
                             _ => "",
                         };
-                        ui.add_sized(BUTTON_SIZE, egui::Label::new(fret_label));
+                        ui.add_sized([BUTTON_SIZE[0], 0.0], egui::Label::new(egui::RichText::new(fret_label).strong()));
                     }
                     ui.end_row();
 
