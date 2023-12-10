@@ -193,6 +193,40 @@ impl eframe::App for TemplateApp {
             });
         });
 
+        // Normalize the chordname so kord::parse can recognize it
+        fn fix_chord_name(chord: &str) -> String {
+            // First, capitalize the first letter if it's a-g
+            let mut chord = chord.to_owned();
+            if let Some(c) = chord.chars().next() {
+                if let 'a'..='g' = c {
+                    chord = format!("{}{}", c.to_ascii_uppercase(), &chord[1..]);
+                }
+            }
+
+            // Uppercase the first letter after a slash (if it's a note)
+            let mut last_was_slash = false;
+            let mut ret = String::new();
+            for c in chord.chars() {
+                if last_was_slash {
+                    if let 'a'..='g' = c {
+                        ret.push(c.to_ascii_uppercase());
+                    } else {
+                        ret.push(c);
+                    }
+                } else {
+                    ret.push(c);
+                }
+                last_was_slash = c == '/';
+            }
+
+            // convert Maj, MAj, etc, to lowercase
+            ret = ret.replace("Maj", "maj");
+            ret = ret.replace("MAj", "maj");
+            ret = ret.replace("MAJ", "maj");
+
+            ret
+        }
+
         egui::CentralPanel::default().show(ctx, |ui| {
             // store chord pitches (need HasPitch to convert Note to Pitch)
             use klib::core::pitch::Pitch;
@@ -206,12 +240,7 @@ impl eframe::App for TemplateApp {
                 egui::TextEdit::singleline(&mut self.chord)
                     .hint_text("Enter a chord name"),
             ).changed() {
-                // if chord starts with a-g, capitalize it for UX reasons
-                if let Some(c) = self.chord.chars().next() {
-                    if let 'a'..='g' = c {
-                        self.chord = format!("{}{}", c.to_ascii_uppercase(), &self.chord[1..]);
-                    }
-                }
+                self.chord = fix_chord_name(self.chord.as_str());
             }
 
             ui.add_space(10.0);
