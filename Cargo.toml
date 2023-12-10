@@ -19,7 +19,7 @@ log = "0.4"
 serde = { version = "1", features = ["derive"] }
 
 # use kord from ../kord
-kord = { path = "../kord", features = [
+kord = { git = "https://github.com/twitchax/kord.git", rev = "fa9bb97", features = [
     "audio",
 ] }
 
@@ -32,7 +32,7 @@ env_logger = "0.10"
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = "0.4"
 
-kord = { path = "../kord", features = [
+kord = { git = "https://github.com/twitchax/kord.git", rev = "fa9bb97", features = [
     "audio",
     "wasm",
 ] }

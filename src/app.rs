@@ -29,9 +29,6 @@ impl Default for TemplateApp {
 impl TemplateApp {
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        // This is also where you can customize the look and feel of egui using
-        // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
-
         const FONT_SIZE: f32 = 18.0;
         let ctx = &cc.egui_ctx;
         let mut style = (*ctx.style()).clone();
@@ -114,9 +111,9 @@ fn note_for_fret(string: Note, fret: usize) -> Note {
 
 fn playback_handle_add(handle: PlaybackHandle, handles: &mut
                        Vec<PlaybackHandle>) {
+    // LRU
     const MAX_HANDLES: usize = 50;
     if handles.len() >= MAX_HANDLES {
-        // remove the oldest handle
         handles.remove(0);
     }
     handles.push(handle);
@@ -206,7 +203,7 @@ impl eframe::App for TemplateApp {
             ui.label("Chord name");
             ui.add_space(10.0);
             if ui.add_sized([100.0, 0.0], egui::TextEdit::singleline(&mut self.chord)).changed() {
-                // if chord starts with a-g
+                // if chord starts with a-g, capitalize it for UX reasons
                 if let Some(c) = self.chord.chars().next() {
                     if let 'a'..='g' = c {
                         self.chord = format!("{}{}", c.to_ascii_uppercase(), &self.chord[1..]);
@@ -253,58 +250,55 @@ impl eframe::App for TemplateApp {
             ui.horizontal(|ui| {
                 ui.add_space(30.0);
 
-                egui::ScrollArea::horizontal().show(ui, |ui| {
-                    // TODO: transpose using ui.max_rect() if it's vertical
-                    egui::Grid::new("fretboard").show(ui, |ui| {
-                        ui.style_mut().visuals.widgets.hovered.bg_fill = egui::Color32::DARK_GRAY;
+                egui::Grid::new("fretboard").show(ui, |ui| {
+                    ui.style_mut().visuals.widgets.hovered.bg_fill = egui::Color32::DARK_GRAY;
 
-                        use klib::core::named_pitch::NamedPitch;
-                        use klib::core::octave::Octave;
-                        let tuning: [Note; 6] = [
-                            Note::new(NamedPitch::E, Octave::Four),
-                            Note::new(NamedPitch::B, Octave::Three),
-                            Note::new(NamedPitch::G, Octave::Three),
-                            Note::new(NamedPitch::D, Octave::Three),
-                            Note::new(NamedPitch::A, Octave::Two),
-                            Note::new(NamedPitch::E, Octave::Two),
-                        ];
+                    use klib::core::named_pitch::NamedPitch;
+                    use klib::core::octave::Octave;
+                    let tuning: [Note; 6] = [
+                        Note::new(NamedPitch::E, Octave::Four),
+                        Note::new(NamedPitch::B, Octave::Three),
+                        Note::new(NamedPitch::G, Octave::Three),
+                        Note::new(NamedPitch::D, Octave::Three),
+                        Note::new(NamedPitch::A, Octave::Two),
+                        Note::new(NamedPitch::E, Octave::Two),
+                    ];
 
-                        // Add fretboard labels
+                    // Add fretboard labels
+                    for fret in 0..MAX_FRET {
+                        let fret_label = match fret {
+                            0 => "Open",
+                            3 => "3",
+                            5 => "5",
+                            7 => "7",
+                            9 => "9",
+                            12 => "12",
+                            15 => "15",
+                            17 => "17",
+                            19 => "19",
+                            21 => "21",
+                            _ => "",
+                        };
+                        ui.add_sized(BUTTON_SIZE, egui::Label::new(fret_label));
+                    }
+                    ui.end_row();
+
+                    for _ in 0..MAX_FRET {
+                        ui.separator();
+                    }
+                    ui.end_row();
+
+                    // add a row of buttons for each of the 6 strings
+                    for string in tuning {
                         for fret in 0..MAX_FRET {
-                            let fret_label = match fret {
-                                0 => "Open",
-                                3 => "3",
-                                5 => "5",
-                                7 => "7",
-                                9 => "9",
-                                12 => "12",
-                                15 => "15",
-                                17 => "17",
-                                19 => "19",
-                                21 => "21",
-                                _ => "",
-                            };
-                            ui.add_sized(BUTTON_SIZE, egui::Label::new(fret_label));
+                            // enable only if chord pitches are empty or note is in the chord
+                            let fret_note = note_for_fret(string.clone(), fret);
+                            let enabled = chord_pitches.is_empty() ||
+                                chord_pitches.contains(&fret_note.pitch());
+                            ui.add_enabled(enabled, note_button(fret_note, false, &mut self.playback_handles));
                         }
                         ui.end_row();
-
-                        for _ in 0..MAX_FRET {
-                            ui.separator();
-                        }
-                        ui.end_row();
-
-                        // add a row of buttons for each of the 6 strings
-                        for string in tuning {
-                            for fret in 0..MAX_FRET {
-                                // enable only if chord pitches are empty or note is in the chord
-                                let fret_note = note_for_fret(string.clone(), fret);
-                                let enabled = chord_pitches.is_empty() ||
-                                    chord_pitches.contains(&fret_note.pitch());
-                                ui.add_enabled(enabled, note_button(fret_note, false, &mut self.playback_handles));
-                            }
-                            ui.end_row();
-                        }
-                    });
+                    }
                 });
 
                 ui.add_space(30.0);

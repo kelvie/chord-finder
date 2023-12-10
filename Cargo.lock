@@ -1653,6 +1653,7 @@ checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 [[package]]
 name = "kord"
 version = "0.6.1"
+source = "git+https://github.com/twitchax/kord.git?rev=fa9bb97#fa9bb979b17d77f54812a915657c3121f76c5d82"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1668,6 +1669,7 @@ dependencies = [
  "paste",
  "pest",
  "pest_derive",
+ "proc-macro2",
  "rodio",
  "rustfft",
  "symphonia",
