@@ -285,8 +285,6 @@ impl eframe::App for TemplateApp {
                         }
                         ui.end_row();
 
-                        // TODO: how to span a separator here across all columns without
-                        // breaking the grid?
                         for _ in 0..MAX_FRET {
                             ui.separator();
                         }
@@ -312,11 +310,6 @@ impl eframe::App for TemplateApp {
             ui.add_space(20.0);
 
 
-            // ui.add(egui::github_link_file!(
-            //     "https://github.com/emilk/eframe_template/blob/master/",
-            //     "Source code."
-            // ));
-
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 powered_by_egui_and_eframe(ui);
                 egui::warn_if_debug_build(ui);
@@ -328,6 +321,12 @@ impl eframe::App for TemplateApp {
 
 fn powered_by_egui_and_eframe(ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
+        ui.add(egui::github_link_file!(
+                "https://github.com/kelvie/chord-finder-eframe/",
+                "Source code"
+        ));
+        ui.label(".");
+        ui.add_space(5.0);
         ui.spacing_mut().item_spacing.x = 0.0;
         ui.label("Powered by ");
         ui.hyperlink_to("egui", "https://github.com/emilk/egui");
@@ -336,7 +335,7 @@ fn powered_by_egui_and_eframe(ui: &mut egui::Ui) {
             "eframe",
             "https://github.com/emilk/egui/tree/master/crates/eframe",
         );
-        ui.label(".");
+        ui.label(". ");
     });
 }
 
