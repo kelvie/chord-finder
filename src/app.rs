@@ -19,7 +19,7 @@ pub struct TemplateApp {
 impl Default for TemplateApp {
     fn default() -> Self {
         Self {
-            chord: "C".to_owned(),
+            chord: "".to_owned(),
             playback_handles: Vec::new(),
             selection: Vec::new(),
         }
@@ -233,7 +233,7 @@ impl eframe::App for TemplateApp {
             use klib::core::pitch::HasPitch;
             let mut chord_pitches: Vec<Pitch> = Vec::new();
 
-            ui.heading("Chord Finder");
+            ui.heading("Chord finder");
             ui.add_space(10.0);
             if ui.add_sized(
                 [200.0, 0.0],
@@ -287,6 +287,7 @@ impl eframe::App for TemplateApp {
 
                     use klib::core::named_pitch::NamedPitch;
                     use klib::core::octave::Octave;
+                    // Standard guitar tuning
                     let tuning: [Note; 6] = [
                         Note::new(NamedPitch::E, Octave::Four),
                         Note::new(NamedPitch::B, Octave::Three),
