@@ -1,5 +1,5 @@
-use std::time::Duration;
 use klib::core::base::{Playable, PlaybackHandle};
+use std::time::Duration;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -32,16 +32,18 @@ impl TemplateApp {
         const FONT_SIZE: f32 = 18.0;
         let ctx = &cc.egui_ctx;
         let mut style = (*ctx.style()).clone();
-        style.text_styles.get_mut(&egui::TextStyle::Button).unwrap().size = FONT_SIZE;
+        style
+            .text_styles
+            .get_mut(&egui::TextStyle::Button)
+            .unwrap()
+            .size = FONT_SIZE;
         style.spacing.item_spacing = egui::Vec2::new(0.0, 0.0);
         ctx.set_style(style);
 
         let mut fonts = egui::FontDefinitions::default();
         fonts.font_data.insert(
             "noto_sans_music".to_owned(),
-            egui::FontData::from_static(
-                include_bytes!("../assets/NotoSans-RegularWithMusic.otf")
-            )
+            egui::FontData::from_static(include_bytes!("../assets/NotoSans-RegularWithMusic.otf")),
         );
 
         fonts
@@ -57,7 +59,6 @@ impl TemplateApp {
         if let Some(storage) = cc.storage {
             return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
         }
-
 
         Default::default()
     }
@@ -108,8 +109,7 @@ fn note_for_fret(string: Note, fret: usize) -> Note {
     Note::from_id(note_id).unwrap()
 }
 
-fn playback_handle_add(handle: PlaybackHandle, handles: &mut
-                       Vec<PlaybackHandle>) {
+fn playback_handle_add(handle: PlaybackHandle, handles: &mut Vec<PlaybackHandle>) {
     // LRU
     const MAX_HANDLES: usize = 50;
     if handles.len() >= MAX_HANDLES {
@@ -118,10 +118,12 @@ fn playback_handle_add(handle: PlaybackHandle, handles: &mut
     handles.push(handle);
 }
 
-fn note_button(note: Note, selected: bool,
-               playback_handles: &mut Vec<PlaybackHandle>) -> impl egui::Widget + '_ {
+fn note_button(
+    note: Note,
+    selected: bool,
+    playback_handles: &mut Vec<PlaybackHandle>,
+) -> impl egui::Widget + '_ {
     move |ui: &mut egui::Ui| {
-
         // Scope is in case we want to do style changes for this button
         // specifically, e.g. to set something different if this button is
         // disabled.
@@ -137,25 +139,22 @@ fn note_button(note: Note, selected: bool,
                 let dur = Duration::from_millis(500);
                 // TODO: this crackles, just use the frequency and a different lib
                 // to play sound?
-                let ret =
-                    note.play(Duration::from_millis(0),
-                              dur,
-                              Duration::from_millis(0));
+                let ret = note.play(Duration::from_millis(0), dur, Duration::from_millis(0));
 
                 match ret {
                     Ok(h) => {
                         log::debug!("played note {}", note);
                         // Have to keep the handle around to play the sound.
                         playback_handle_add(h, playback_handles);
-                    },
+                    }
                     Err(e) => log::error!("error playing note: {}", e),
                 }
             }
 
             response
-        }).response
+        })
+        .response
     }
-
 }
 
 impl eframe::App for TemplateApp {
@@ -189,7 +188,6 @@ impl eframe::App for TemplateApp {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::RIGHT), |ui| {
                     egui::widgets::global_dark_light_mode_buttons(ui)
                 });
-
             });
         });
 
@@ -229,24 +227,26 @@ impl eframe::App for TemplateApp {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             // store chord pitches (need HasPitch to convert Note to Pitch)
-            use klib::core::pitch::Pitch;
             use klib::core::pitch::HasPitch;
+            use klib::core::pitch::Pitch;
             let mut chord_pitches: Vec<Pitch> = Vec::new();
 
             ui.heading("Chord finder");
             ui.add_space(10.0);
-            if ui.add_sized(
-                [200.0, 0.0],
-                egui::TextEdit::singleline(&mut self.chord)
-                    .hint_text("Enter a chord name"),
-            ).changed() {
+            if ui
+                .add_sized(
+                    [200.0, 0.0],
+                    egui::TextEdit::singleline(&mut self.chord).hint_text("Enter a chord name"),
+                )
+                .changed()
+            {
                 self.chord = fix_chord_name(self.chord.as_str());
             }
 
             ui.add_space(10.0);
             // Add a text field for the user to enter a chord name
-            use klib::core::chord::Chord;
             use klib::core::base::Parsable;
+            use klib::core::chord::Chord;
             use klib::core::chord::HasChord;
 
             // parse the chord and show it
@@ -255,17 +255,12 @@ impl eframe::App for TemplateApp {
                 egui::Grid::new("chord_id").show(ui, |ui| {
                     match chord {
                         Ok(chord) => {
-                            chord.chord()
-                                 .iter()
-                                 .for_each(|note| {
-                                     ui.add(note_button(
-                                         *note, false, &mut self.playback_handles)
-                                     );
-                                     // store pitch
-                                     chord_pitches.push(note.pitch());
-                                 });
-
-                        },
+                            chord.chord().iter().for_each(|note| {
+                                ui.add(note_button(*note, false, &mut self.playback_handles));
+                                // store pitch
+                                chord_pitches.push(note.pitch());
+                            });
+                        }
                         Err(_e) => {
                             ui.label(format!("Invalid chord: {}", self.chord));
                         }
@@ -312,7 +307,10 @@ impl eframe::App for TemplateApp {
                             21 => "21",
                             _ => "",
                         };
-                        ui.add_sized([BUTTON_SIZE[0], 0.0], egui::Label::new(egui::RichText::new(fret_label).strong()));
+                        ui.add_sized(
+                            [BUTTON_SIZE[0], 0.0],
+                            egui::Label::new(egui::RichText::new(fret_label).strong()),
+                        );
                     }
                     ui.end_row();
 
@@ -326,9 +324,12 @@ impl eframe::App for TemplateApp {
                         for fret in 0..MAX_FRET {
                             // enable only if chord pitches are empty or note is in the chord
                             let fret_note = note_for_fret(string.clone(), fret);
-                            let enabled = chord_pitches.is_empty() ||
-                                chord_pitches.contains(&fret_note.pitch());
-                            ui.add_enabled(enabled, note_button(fret_note, false, &mut self.playback_handles));
+                            let enabled = chord_pitches.is_empty()
+                                || chord_pitches.contains(&fret_note.pitch());
+                            ui.add_enabled(
+                                enabled,
+                                note_button(fret_note, false, &mut self.playback_handles),
+                            );
                         }
                         ui.end_row();
                     }
@@ -338,7 +339,6 @@ impl eframe::App for TemplateApp {
             });
 
             ui.add_space(20.0);
-
 
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 powered_by_egui_and_eframe(ui);
@@ -352,8 +352,8 @@ impl eframe::App for TemplateApp {
 fn powered_by_egui_and_eframe(ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.add(egui::github_link_file!(
-                "https://github.com/kelvie/chord-finder-eframe/",
-                "Source code"
+            "https://github.com/kelvie/chord-finder-eframe/",
+            "Source code"
         ));
         ui.label(".");
         ui.add_space(5.0);
@@ -366,21 +366,21 @@ fn powered_by_egui_and_eframe(ui: &mut egui::Ui) {
             "https://github.com/emilk/egui/tree/master/crates/eframe",
         );
         ui.label(" and ");
-        ui.hyperlink_to(
-            "kord",
-            "https://github.com/twitchax/kord",
-        );
+        ui.hyperlink_to("kord", "https://github.com/twitchax/kord");
         ui.label(". ");
     });
 }
 
 #[cfg(test)]
 mod tests {
-    use klib::core::note::*;
     use klib::core::interval::Interval;
+    use klib::core::note::*;
 
     #[test]
     fn test_turning_flat_to_sharps() {
-        assert_eq!(GFlat + Interval::AugmentedSeventh - Interval::PerfectOctave, FSharp);
+        assert_eq!(
+            GFlat + Interval::AugmentedSeventh - Interval::PerfectOctave,
+            FSharp
+        );
     }
 }
