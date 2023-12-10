@@ -6,7 +6,7 @@ use klib::core::base::{Playable, PlaybackHandle};
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct TemplateApp {
     // Example stuff:
-    label: String,
+    chord: String,
 
     #[serde(skip)] // This how you opt-out of serialization of a field
     value: f32,
@@ -19,7 +19,7 @@ impl Default for TemplateApp {
     fn default() -> Self {
         Self {
             // Example stuff:
-            label: "Hello World!".to_owned(),
+            chord: "C".to_owned(),
             value: 2.7,
             playback_handle: None,
         }
@@ -40,6 +40,22 @@ impl TemplateApp {
         style.spacing.button_padding = egui::Vec2::new(20.0, 20.0);
         style.spacing.item_spacing = egui::Vec2::new(0.0, 0.0);
         ctx.set_style(style);
+
+        let mut fonts = egui::FontDefinitions::default();
+        fonts.font_data.insert(
+            "noto_sans_music".to_owned(),
+            egui::FontData::from_static(
+                include_bytes!("../assets/NotoSans-RegularWithMusic.otf")
+            )
+        );
+
+        fonts
+            .families
+            .entry(egui::FontFamily::Proportional)
+            .or_default()
+            .insert(0, "noto_sans_music".to_owned());
+
+        ctx.set_fonts(fonts);
 
         // Load previous app state (if any).
         // Note that you must enable the `persistence` feature for this to work.
@@ -66,8 +82,6 @@ fn format_note_name(mut note: Note) -> String {
     let mut s = String::new();
     for c in note.to_string().chars() {
         s.push(match c {
-            '♯' => '#',
-            '♭' => 'b',
             '0' => '₀',
             '1' => '₁',
             '2' => '₂',
@@ -90,12 +104,13 @@ const MAX_FRET: usize = 17;
 use klib::core::note::HasNoteId;
 use klib::core::note::Note;
 
+fn note_for_fret(string: Note, fret: usize) -> Note {
+    let note_id = string.id() << fret;
+    Note::from_id(note_id).unwrap()
+}
 
-fn fret_string(string: Note, fret: usize, selected: bool, playback_handle: &mut Option<PlaybackHandle>) -> impl egui::Widget + '_ {
+fn note_button(note: Note, selected: bool, playback_handle: &mut Option<PlaybackHandle>) -> impl egui::Widget + '_ {
     move |ui: &mut egui::Ui| {
-
-        let note_id = string.id() << fret;
-        let note = Note::from_id(note_id).unwrap();
 
         let note_name = format_note_name(note);
 
@@ -161,10 +176,41 @@ impl eframe::App for TemplateApp {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            // center the heading
-            ui.vertical_centered(|ui| {
-                ui.heading("Fretboard");
+
+            // Add a text field for the user to enter a chord name
+            egui::Grid::new("chord_id").show(ui, |ui| {
+                ui.label("Chord name: ");
+                ui.add_sized([100.0, 20.0], egui::TextEdit::singleline(&mut self.chord));
+
+                use klib::core::chord::Chord;
+                use klib::core::base::Parsable;
+                use klib::core::chord::HasChord;
+
+                // parse the chord and show it
+                let chord = Chord::parse(self.chord.as_str());
+                match chord {
+                    Ok(chord) => {
+                        chord.chord()
+                             .iter()
+                             .for_each(|note| {
+                                 // TODO: figure out why this is so misaligned
+                                 ui.add(note_button(
+                                     *note, false, &mut self.playback_handle)
+                                 );
+                             });
+
+                    },
+                    Err(_e) => {
+                        // Show an error message with the chord if not empty
+                        if !self.chord.is_empty() {
+                            ui.label(format!("Invalid chord: {}", self.chord));
+                        }
+                    }
+                }
             });
+
+            // TODO center the heading with the fretboard (or what's visible of it)
+            ui.heading("Fretboard");
 
             ui.add_space(20.0);
 
@@ -173,6 +219,7 @@ impl eframe::App for TemplateApp {
 
                 egui::ScrollArea::horizontal().show(ui, |ui| {
                     // Make a grid
+                    // TODO: transpose using ui.max_rect() if it's vertical
                     egui::Grid::new("fretboard").show(ui, |ui| {
                         ui.style_mut().visuals.widgets.hovered.bg_fill = egui::Color32::DARK_GRAY;
 
@@ -216,8 +263,7 @@ impl eframe::App for TemplateApp {
                         // add a row of buttons for each of the 6 strings
                         for string in tuning {
                             for fret in 0..MAX_FRET {
-                                ui.add(fret_string(string.clone(),
-                                                   fret,
+                                ui.add(note_button(note_for_fret(string.clone(), fret),
                                                    false,
                                                    &mut self.playback_handle));
                             }
@@ -228,6 +274,8 @@ impl eframe::App for TemplateApp {
 
                 ui.add_space(30.0);
             });
+
+            ui.add_space(20.0);
 
 
             // ui.add(egui::github_link_file!(
