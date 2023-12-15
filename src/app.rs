@@ -26,19 +26,11 @@ impl Default for TemplateApp {
     }
 }
 
+// TODO: allow pinch to zoom
 impl TemplateApp {
     /// Called once before the first frame.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        const FONT_SIZE: f32 = 18.0;
         let ctx = &cc.egui_ctx;
-        let mut style = (*ctx.style()).clone();
-        style
-            .text_styles
-            .get_mut(&egui::TextStyle::Button)
-            .unwrap()
-            .size = FONT_SIZE;
-        style.spacing.item_spacing = egui::Vec2::new(0.0, 0.0);
-        ctx.set_style(style);
 
         let mut fonts = egui::FontDefinitions::default();
         fonts.font_data.insert(
@@ -97,6 +89,7 @@ fn format_note_name(note: Note) -> String {
     s
 }
 
+const MAIN_FONT_SIZE: f32 = 18.0;
 const BUTTON_HEIGHT: f32 = 60.0;
 const BUTTON_SIZE: [f32; 2] = [BUTTON_HEIGHT, BUTTON_HEIGHT];
 const MAX_FRET: usize = 17;
@@ -191,6 +184,15 @@ impl eframe::App for TemplateApp {
             });
         });
 
+        egui::CentralPanel::default().show(ctx, |_ui| {
+            // Just here to paint a background
+        });
+
+        egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
+            egui::warn_if_debug_build(ui);
+            powered_by_egui_and_eframe(ui);
+        });
+
         // Normalize the chordname so kord::parse can recognize it
         fn fix_chord_name(chord: &str) -> String {
             // First, capitalize the first letter if it's a-g
@@ -225,57 +227,93 @@ impl eframe::App for TemplateApp {
             ret
         }
 
-        egui::CentralPanel::default().show(ctx, |ui| {
-            // store chord pitches (need HasPitch to convert Note to Pitch)
-            use klib::core::pitch::HasPitch;
-            use klib::core::pitch::Pitch;
-            let mut chord_pitches: Vec<Pitch> = Vec::new();
+        egui::Area::new("main")
+            .anchor(egui::Align2::CENTER_TOP, egui::Vec2::ZERO)
+            .constrain(true)
+            .show(ctx, |ui| {
 
-            ui.heading("Chord finder");
-            ui.add_space(10.0);
-            if ui
-                .add_sized(
-                    [200.0, 0.0],
-                    egui::TextEdit::singleline(&mut self.chord).hint_text("Enter a chord name"),
-                )
-                .changed()
-            {
-                self.chord = fix_chord_name(self.chord.as_str());
-            }
+                let style = ui.style_mut();
+                style
+                    .text_styles
+                    .get_mut(&egui::TextStyle::Button)
+                    .unwrap()
+                    .size = MAIN_FONT_SIZE;
 
-            ui.add_space(10.0);
-            // Add a text field for the user to enter a chord name
-            use klib::core::base::Parsable;
-            use klib::core::chord::Chord;
-            use klib::core::chord::HasChord;
+                style
+                    .text_styles
+                    .get_mut(&egui::TextStyle::Body)
+                    .unwrap()
+                    .size = MAIN_FONT_SIZE;
 
-            // parse the chord and show it
-            let chord = Chord::parse(self.chord.as_str());
-            if !self.chord.is_empty() {
-                egui::Grid::new("chord_id").show(ui, |ui| {
-                    match chord {
-                        Ok(chord) => {
-                            chord.chord().iter().for_each(|note| {
-                                ui.add(note_button(*note, false, &mut self.playback_handles));
-                                // store pitch
-                                chord_pitches.push(note.pitch());
-                            });
-                        }
-                        Err(_e) => {
-                            ui.label(format!("Invalid chord: {}", self.chord));
-                        }
-                    }
-                });
-            }
+                style
+                    .text_styles
+                    .get_mut(&egui::TextStyle::Heading)
+                    .unwrap()
+                    .size = 12.0;
 
-            // TODO center the heading with the fretboard (or what's visible of
-            // it). Or just make this look nicer.
-            ui.heading("Fretboard");
+                style.spacing.item_spacing = egui::Vec2::new(0.0, 0.0);
 
-            ui.add_space(20.0);
+                // store chord pitches (need HasPitch to convert Note to Pitch)
+                use klib::core::pitch::HasPitch;
+                use klib::core::pitch::Pitch;
+                let mut chord_pitches: Vec<Pitch> = Vec::new();
 
-            ui.horizontal(|ui| {
+                // Space from the top bar
                 ui.add_space(30.0);
+                ui.horizontal(|ui| {
+                    ui.vertical(|ui| {
+                        ui.heading("Chord finder");
+                        if ui
+                            .add_sized(
+                                [200.0, BUTTON_HEIGHT],
+                                egui::TextEdit::singleline(&mut self.chord)
+                                    .vertical_align(egui::Align::Center),
+                            )
+                            .changed()
+                        {
+                            self.chord = fix_chord_name(self.chord.as_str());
+                        }
+                    });
+
+                    // Add a text field for the user to enter a chord name
+                    use klib::core::base::Parsable;
+                    use klib::core::chord::Chord;
+                    use klib::core::chord::HasChord;
+
+                    // TODO: make vertical if the screen is narrow
+                    let screen_rect = ctx.available_rect();
+                    let _horizontal = screen_rect.width() > screen_rect.height();
+                    ui.add_space(30.0);
+                    ui.vertical(|ui| {
+                        // parse the chord and show it
+                        let chord = Chord::parse(self.chord.as_str());
+                        if !self.chord.is_empty() {
+                            match chord {
+                                Ok(chord) => {
+                                    ui.heading("Chord notes");
+                                    ui.horizontal(|ui| {
+                                        chord.chord().iter().for_each(|note| {
+                                            ui.add(note_button(
+                                                *note,
+                                                false,
+                                                &mut self.playback_handles,
+                                            ));
+                                            // store pitch
+                                            chord_pitches.push(note.pitch());
+                                        });
+                                    });
+                                }
+                                Err(_e) => {
+                                    ui.label(format!("Invalid chord: {}", self.chord));
+                                }
+                            }
+                        }
+                    });
+                });
+
+                ui.add_space(20.0);
+
+                ui.heading("Fretboard");
 
                 egui::Grid::new("fretboard").show(ui, |ui| {
                     ui.style_mut().visuals.widgets.hovered.bg_fill = egui::Color32::DARK_GRAY;
@@ -309,7 +347,7 @@ impl eframe::App for TemplateApp {
                         };
                         ui.add_sized(
                             [BUTTON_SIZE[0], 0.0],
-                            egui::Label::new(egui::RichText::new(fret_label).strong()),
+                            egui::Label::new(egui::RichText::new(fret_label).strong().size(12.0)),
                         );
                     }
                     ui.end_row();
@@ -335,22 +373,14 @@ impl eframe::App for TemplateApp {
                     }
                 });
 
-                ui.add_space(30.0);
+                ui.add_space(20.0);
             });
-
-            ui.add_space(20.0);
-
-            ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                powered_by_egui_and_eframe(ui);
-                egui::warn_if_debug_build(ui);
-                ui.separator();
-            });
-        });
     }
 }
 
 fn powered_by_egui_and_eframe(ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
+
         ui.add(egui::github_link_file!(
             "https://github.com/kelvie/chord-finder-eframe/",
             "Source code"
