@@ -123,7 +123,7 @@ fn note_button(
         ui.scope(|ui| {
             let note_name = match ui.is_enabled() {
                 true => format_note_name(note),
-                false => "|".to_owned(),
+                false => "".to_owned(),
             };
 
             let label = egui::SelectableLabel::new(selected, note_name);
@@ -144,10 +144,41 @@ fn note_button(
                 }
             }
 
+            // Draw a line through the button if it's disabled, to help align frets
+            if !ui.is_enabled() {
+                let stroke = egui::Stroke::new(0.5, ui.visuals().widgets.inactive.fg_stroke.color);
+                const OFFSET: f32 = 15.0;
+
+                // TODO: handle horizontal vs vertical
+                ui.painter().line_segment(
+                    [
+                        ui.min_rect().center_top() + egui::Vec2::new(0.0, OFFSET),
+                        ui.min_rect().center_bottom() - egui::Vec2::new(0.0, OFFSET),
+                    ],
+                    stroke,
+                );
+            }
             response
         })
         .response
     }
+}
+
+fn fret_label(fret: usize) -> String {
+    match fret {
+        0 => "Open",
+        3 => "3",
+        5 => "5",
+        7 => "7",
+        9 => "9",
+        12 => "12",
+        15 => "15",
+        17 => "17",
+        19 => "19",
+        21 => "21",
+        _ => "",
+    }
+    .to_owned()
 }
 
 impl eframe::App for TemplateApp {
@@ -279,14 +310,13 @@ impl eframe::App for TemplateApp {
                     use klib::core::chord::Chord;
                     use klib::core::chord::HasChord;
 
-                    // TODO: make vertical if the screen is narrow
-                    let screen_rect = ctx.available_rect();
-                    let _horizontal = screen_rect.width() > screen_rect.height();
-                    ui.add_space(30.0);
-                    ui.vertical(|ui| {
-                        // parse the chord and show it
-                        let chord = Chord::parse(self.chord.as_str());
-                        if !self.chord.is_empty() {
+                    // parse the chord and show it
+                    let chord = Chord::parse(self.chord.as_str());
+                    if !self.chord.is_empty() {
+                        ui.add_space(15.0);
+                        ui.separator();
+                        ui.add_space(15.0);
+                        ui.vertical(|ui| {
                             match chord {
                                 Ok(chord) => {
                                     ui.heading("Chord notes");
@@ -306,13 +336,17 @@ impl eframe::App for TemplateApp {
                                     ui.label(format!("Invalid chord: {}", self.chord));
                                 }
                             }
-                        }
-                    });
+                        });
+                    }
                 });
 
                 ui.add_space(20.0);
 
                 ui.heading("Fretboard");
+
+                // TODO: make vertical if the screen is narrow
+                let screen_rect = ctx.available_rect();
+                let _horizontal = screen_rect.width() > screen_rect.height();
 
                 egui::Grid::new("fretboard").show(ui, |ui| {
                     ui.style_mut().visuals.widgets.hovered.bg_fill = egui::Color32::DARK_GRAY;
@@ -331,22 +365,11 @@ impl eframe::App for TemplateApp {
 
                     // Add fretboard labels
                     for fret in 0..MAX_FRET {
-                        let fret_label = match fret {
-                            0 => "Open",
-                            3 => "3",
-                            5 => "5",
-                            7 => "7",
-                            9 => "9",
-                            12 => "12",
-                            15 => "15",
-                            17 => "17",
-                            19 => "19",
-                            21 => "21",
-                            _ => "",
-                        };
                         ui.add_sized(
                             [BUTTON_SIZE[0], 0.0],
-                            egui::Label::new(egui::RichText::new(fret_label).strong().size(12.0)),
+                            egui::Label::new(
+                                egui::RichText::new(fret_label(fret)).strong().size(12.0),
+                            ),
                         );
                     }
                     ui.end_row();
