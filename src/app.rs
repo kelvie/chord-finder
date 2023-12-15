@@ -231,7 +231,6 @@ impl eframe::App for TemplateApp {
             .anchor(egui::Align2::CENTER_TOP, egui::Vec2::ZERO)
             .constrain(true)
             .show(ctx, |ui| {
-
                 let style = ui.style_mut();
                 style
                     .text_styles
@@ -380,7 +379,6 @@ impl eframe::App for TemplateApp {
 
 fn powered_by_egui_and_eframe(ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
-
         ui.add(egui::github_link_file!(
             "https://github.com/kelvie/chord-finder-eframe/",
             "Source code"
