@@ -181,6 +181,40 @@ fn fret_label(fret: usize) -> String {
     .to_owned()
 }
 
+// Normalize the chordname so kord::parse can recognize it
+fn fix_chord_name(chord: &str) -> String {
+    // First, capitalize the first letter if it's a-g
+    let mut chord = chord.to_owned();
+    if let Some(c) = chord.chars().next() {
+        if let 'a'..='g' = c {
+            chord = format!("{}{}", c.to_ascii_uppercase(), &chord[1..]);
+        }
+    }
+
+    // Uppercase the first letter after a slash (if it's a note)
+    let mut last_was_slash = false;
+    let mut ret = String::new();
+    for c in chord.chars() {
+        if last_was_slash {
+            if let 'a'..='g' = c {
+                ret.push(c.to_ascii_uppercase());
+            } else {
+                ret.push(c);
+            }
+        } else {
+            ret.push(c);
+        }
+        last_was_slash = c == '/';
+    }
+
+    // convert Maj, MAj, etc, to lowercase
+    ret = ret.replace("Maj", "maj");
+    ret = ret.replace("MAj", "maj");
+    ret = ret.replace("MAJ", "maj");
+
+    ret
+}
+
 impl eframe::App for TemplateApp {
     /// Called by the frame work to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
@@ -224,39 +258,6 @@ impl eframe::App for TemplateApp {
             powered_by_egui_and_eframe(ui);
         });
 
-        // Normalize the chordname so kord::parse can recognize it
-        fn fix_chord_name(chord: &str) -> String {
-            // First, capitalize the first letter if it's a-g
-            let mut chord = chord.to_owned();
-            if let Some(c) = chord.chars().next() {
-                if let 'a'..='g' = c {
-                    chord = format!("{}{}", c.to_ascii_uppercase(), &chord[1..]);
-                }
-            }
-
-            // Uppercase the first letter after a slash (if it's a note)
-            let mut last_was_slash = false;
-            let mut ret = String::new();
-            for c in chord.chars() {
-                if last_was_slash {
-                    if let 'a'..='g' = c {
-                        ret.push(c.to_ascii_uppercase());
-                    } else {
-                        ret.push(c);
-                    }
-                } else {
-                    ret.push(c);
-                }
-                last_was_slash = c == '/';
-            }
-
-            // convert Maj, MAj, etc, to lowercase
-            ret = ret.replace("Maj", "maj");
-            ret = ret.replace("MAj", "maj");
-            ret = ret.replace("MAJ", "maj");
-
-            ret
-        }
 
         egui::Area::new("main")
             .anchor(egui::Align2::CENTER_TOP, egui::Vec2::ZERO)
@@ -348,20 +349,21 @@ impl eframe::App for TemplateApp {
                 let screen_rect = ctx.available_rect();
                 let _horizontal = screen_rect.width() > screen_rect.height();
 
+                use klib::core::named_pitch::NamedPitch;
+                use klib::core::octave::Octave;
+                // Standard guitar tuning
+                let tuning: [Note; 6] = [
+                    Note::new(NamedPitch::E, Octave::Four),
+                    Note::new(NamedPitch::B, Octave::Three),
+                    Note::new(NamedPitch::G, Octave::Three),
+                    Note::new(NamedPitch::D, Octave::Three),
+                    Note::new(NamedPitch::A, Octave::Two),
+                    Note::new(NamedPitch::E, Octave::Two),
+                ];
                 egui::Grid::new("fretboard").show(ui, |ui| {
-                    ui.style_mut().visuals.widgets.hovered.bg_fill = egui::Color32::DARK_GRAY;
+                    // I forget what this does
+                    // ui.style_mut().visuals.widgets.hovered.bg_fill = egui::Color32::DARK_GRAY;
 
-                    use klib::core::named_pitch::NamedPitch;
-                    use klib::core::octave::Octave;
-                    // Standard guitar tuning
-                    let tuning: [Note; 6] = [
-                        Note::new(NamedPitch::E, Octave::Four),
-                        Note::new(NamedPitch::B, Octave::Three),
-                        Note::new(NamedPitch::G, Octave::Three),
-                        Note::new(NamedPitch::D, Octave::Three),
-                        Note::new(NamedPitch::A, Octave::Two),
-                        Note::new(NamedPitch::E, Octave::Two),
-                    ];
 
                     // Add fretboard labels
                     for fret in 0..MAX_FRET {
