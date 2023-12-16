@@ -272,98 +272,98 @@ impl eframe::App for TemplateApp {
                 let screen_rect = ctx.available_rect();
                 let horizontal = (screen_rect.width() / screen_rect.height()) > 1.7;
 
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    let style = ui.style_mut();
-                    style
-                        .text_styles
-                        .get_mut(&egui::TextStyle::Button)
-                        .unwrap()
-                        .size = MAIN_FONT_SIZE;
+                let style = ui.style_mut();
+                style
+                    .text_styles
+                    .get_mut(&egui::TextStyle::Button)
+                    .unwrap()
+                    .size = MAIN_FONT_SIZE;
 
-                    style
-                        .text_styles
-                        .get_mut(&egui::TextStyle::Body)
-                        .unwrap()
-                        .size = MAIN_FONT_SIZE;
+                style
+                    .text_styles
+                    .get_mut(&egui::TextStyle::Body)
+                    .unwrap()
+                    .size = MAIN_FONT_SIZE;
 
-                    style
-                        .text_styles
-                        .get_mut(&egui::TextStyle::Heading)
-                        .unwrap()
-                        .size = 12.0;
+                style
+                    .text_styles
+                    .get_mut(&egui::TextStyle::Heading)
+                    .unwrap()
+                    .size = 12.0;
 
-                    style.spacing.item_spacing = egui::Vec2::new(0.0, 0.0);
+                style.spacing.item_spacing = egui::Vec2::new(0.0, 0.0);
 
-                    // store chord pitches (need HasPitch to convert Note to Pitch)
-                    use klib::core::pitch::HasPitch;
-                    use klib::core::pitch::Pitch;
-                    let mut chord_pitches: Vec<Pitch> = Vec::new();
+                // store chord pitches (need HasPitch to convert Note to Pitch)
+                use klib::core::pitch::HasPitch;
+                use klib::core::pitch::Pitch;
+                let mut chord_pitches: Vec<Pitch> = Vec::new();
 
-                    ui.horizontal(|ui| {
-                        ui.vertical(|ui| {
-                            ui.heading("Chord finder");
-                            if ui
-                                .add_sized(
-                                    [150.0, BUTTON_HEIGHT],
-                                    egui::TextEdit::singleline(&mut self.chord)
-                                        .vertical_align(egui::Align::Center),
-                                )
-                                .changed()
-                            {
-                                self.chord = fix_chord_name(self.chord.as_str());
-                            }
-                        });
-
-                        // Add a text field for the user to enter a chord name
-                        use klib::core::base::Parsable;
-                        use klib::core::chord::Chord;
-                        use klib::core::chord::HasChord;
-
-                        // parse the chord and show it
-                        let chord = Chord::parse(self.chord.as_str());
-                        if !self.chord.is_empty() {
-                            ui.add_space(15.0);
-                            ui.separator();
-                            ui.add_space(15.0);
-                            ui.vertical(|ui| {
-                                match chord {
-                                    Ok(chord) => {
-                                        ui.heading("Chord notes");
-                                        ui.horizontal(|ui| {
-                                            chord.chord().iter().for_each(|note| {
-                                                if horizontal {
-                                                    ui.add(note_button(
-                                                        *note,
-                                                        false,
-                                                        true,
-                                                        &mut self.playback_handles,
-                                                    ));
-                                                } else {
-                                                    use egui::widgets::Label;
-                                                    ui.add_sized(
-                                                        [0.0, BUTTON_SIZE[1]],
-                                                        Label::new(format_note_name(*note)),
-                                                    );
-                                                    ui.add_space(8.0);
-                                                }
-
-                                                // store pitch
-                                                chord_pitches.push(note.pitch());
-                                            });
-                                        });
-                                    }
-                                    Err(_e) => {
-                                        ui.heading(format!("Invalid chord: {}", self.chord));
-                                    }
-                                }
-                            });
+                ui.horizontal(|ui| {
+                    ui.vertical(|ui| {
+                        ui.heading("Chord finder");
+                        if ui
+                            .add_sized(
+                                [150.0, BUTTON_HEIGHT],
+                                egui::TextEdit::singleline(&mut self.chord)
+                                    .vertical_align(egui::Align::Center),
+                            )
+                            .changed()
+                        {
+                            self.chord = fix_chord_name(self.chord.as_str());
                         }
                     });
 
-                    ui.add_space(20.0);
+                    // Add a text field for the user to enter a chord name
+                    use klib::core::base::Parsable;
+                    use klib::core::chord::Chord;
+                    use klib::core::chord::HasChord;
 
-                    ui.heading("Fretboard");
+                    // parse the chord and show it
+                    let chord = Chord::parse(self.chord.as_str());
+                    if !self.chord.is_empty() {
+                        ui.add_space(15.0);
+                        ui.separator();
+                        ui.add_space(15.0);
+                        ui.vertical(|ui| {
+                            match chord {
+                                Ok(chord) => {
+                                    ui.heading("Chord notes");
+                                    ui.horizontal(|ui| {
+                                        chord.chord().iter().for_each(|note| {
+                                            if horizontal {
+                                                ui.add(note_button(
+                                                    *note,
+                                                    false,
+                                                    true,
+                                                    &mut self.playback_handles,
+                                                ));
+                                            } else {
+                                                use egui::widgets::Label;
+                                                ui.add_sized(
+                                                    [0.0, BUTTON_SIZE[1]],
+                                                    Label::new(format_note_name(*note)),
+                                                );
+                                                ui.add_space(8.0);
+                                            }
 
+                                            // store pitch
+                                            chord_pitches.push(note.pitch());
+                                        });
+                                    });
+                                }
+                                Err(_e) => {
+                                    ui.heading(format!("Invalid chord: {}", self.chord));
+                                }
+                            }
+                        });
+                    }
+                });
+
+                ui.add_space(20.0);
+
+                ui.heading("Fretboard");
+
+                egui::ScrollArea::vertical().show(ui, |ui| {
                     use klib::core::named_pitch::NamedPitch;
                     use klib::core::octave::Octave;
                     // Standard guitar tuning -- TODO: make this configurable
@@ -416,10 +416,11 @@ impl eframe::App for TemplateApp {
                             }
                         } else {
                             for fret in 0..MAX_FRET {
-                                for string in tuning {
-                                    fret_note_widget(ui, string, fret);
-                                }
+                                // Reverse string tuning
                                 fret_label_widget(ui, fret);
+                                for string in tuning.iter().rev() {
+                                    fret_note_widget(ui, *string, fret);
+                                }
                                 ui.end_row();
                             }
                         }
