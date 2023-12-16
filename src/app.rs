@@ -402,13 +402,13 @@ impl eframe::App for TemplateApp {
 
 fn powered_by_egui_and_eframe(ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 0.0;
         ui.add(egui::github_link_file!(
             "https://github.com/kelvie/chord-finder-eframe/",
             "Source code"
         ));
         ui.label(".");
         ui.add_space(5.0);
-        ui.spacing_mut().item_spacing.x = 0.0;
         ui.label("Powered by ");
         ui.hyperlink_to("egui", "https://github.com/emilk/egui");
         ui.label(" and ");
