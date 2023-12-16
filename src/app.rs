@@ -270,7 +270,7 @@ impl eframe::App for TemplateApp {
                 // If screen is narrow, (e.g. phones in portrait mode), make
                 // things more compact vertically
                 let screen_rect = ctx.available_rect();
-                let horizontal = screen_rect.width() > BUTTON_SIZE[0] * (MAX_FRET + 1) as f32;
+                let horizontal = (screen_rect.width() / screen_rect.height()) > 1.7;
 
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     let style = ui.style_mut();
