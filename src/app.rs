@@ -92,7 +92,7 @@ fn format_note_name(note: Note) -> String {
 const MAIN_FONT_SIZE: f32 = 18.0;
 const BUTTON_HEIGHT: f32 = 60.0;
 const BUTTON_SIZE: [f32; 2] = [BUTTON_HEIGHT, BUTTON_HEIGHT];
-const MAX_FRET: usize = 17;
+const MAX_FRET: usize = 16;
 
 use klib::core::note::HasNoteId;
 use klib::core::note::Note;
@@ -258,19 +258,28 @@ impl eframe::App for TemplateApp {
             // Just here to paint a background
         });
 
-        egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
-            egui::warn_if_debug_build(ui);
-            powered_by_egui_and_eframe(ui);
-        });
-
+        // Estimate the space needed to not overlap the bottom panel
+        const BOTTOM_PANEL_SLOP: f32 = 24.0;
         egui::Area::new("main")
-            .anchor(egui::Align2::CENTER_TOP, egui::Vec2::ZERO)
-            .constrain_to(ctx.available_rect().shrink2([0.0, 32.0].into()))
+            .anchor(egui::Align2::CENTER_TOP, [0.0, 5.0])
+            // The goal of this constrain is to stop it from overlapping
+            // the bottom panel.
+            .constrain_to(
+                ctx.available_rect()
+                    .translate([0.0, -BOTTOM_PANEL_SLOP].into())
+                    .shrink2([0.0, BOTTOM_PANEL_SLOP].into()),
+            )
             .show(ctx, |ui| {
                 // If screen is narrow, (e.g. phones in portrait mode), make
                 // things more compact vertically
                 let screen_rect = ctx.available_rect();
-                let horizontal = (screen_rect.width() / screen_rect.height()) > 1.7;
+                let wide_enough = screen_rect.width() > BUTTON_SIZE[0] * (MAX_FRET as f32);
+                let tall_enough = screen_rect.height() > BUTTON_SIZE[1] * (MAX_FRET as f32 + 3.0);
+                let aspect_ratio = screen_rect.width() / screen_rect.height();
+                let max_aspect_ratio = MAX_FRET as f32 / 10.0;
+
+                // Needs to be wide enough *or* if its narrow enough up to a certain point
+                let horizontal = wide_enough && !tall_enough || aspect_ratio > max_aspect_ratio;
 
                 let style = ui.style_mut();
                 style
@@ -425,9 +434,13 @@ impl eframe::App for TemplateApp {
                             }
                         }
                     });
-                    ui.add_space(20.0);
                 });
             });
+
+        egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
+            egui::warn_if_debug_build(ui);
+            powered_by_egui_and_eframe(ui);
+        });
     }
 }
 
