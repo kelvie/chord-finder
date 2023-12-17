@@ -448,19 +448,19 @@ fn powered_by_egui_and_eframe(ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;
         ui.add(egui::github_link_file!(
-            "https://github.com/kelvie/chord-finder-eframe/",
+            "https://github.com/kelvie/chord-finder/",
             "Source code"
         ));
         ui.label(".");
         ui.add_space(5.0);
         ui.label("Powered by ");
         ui.hyperlink_to("egui", "https://github.com/emilk/egui");
-        ui.label(" and ");
+        ui.label(", ");
         ui.hyperlink_to(
             "eframe",
             "https://github.com/emilk/egui/tree/master/crates/eframe",
         );
-        ui.label(" and ");
+        ui.label(", and ");
         ui.hyperlink_to("kord", "https://github.com/twitchax/kord");
         ui.label(". ");
     });
