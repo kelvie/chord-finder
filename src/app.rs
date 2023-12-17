@@ -448,7 +448,7 @@ fn powered_by_egui_and_eframe(ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;
         ui.add(egui::github_link_file!(
-            "https://github.com/kelvie/chord-finder/",
+            "https://github.com/kelvie/chord-finder/blob/master/",
             "Source code"
         ));
         ui.label(".");
