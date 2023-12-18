@@ -212,7 +212,9 @@ fn fix_chord_name(chord: &str) -> String {
         last_was_slash = c == '/';
     }
 
-    // convert Maj, MAj, etc, to lowercase
+    // convert Maj, MAj, etc, to lowercase (yes it's not exhaustive, but this is
+    // meant to only catch common errors and adding the regex crate adds almost
+    // 1MB to the wasm binary
     ret = ret.replace("Maj", "maj");
     ret = ret.replace("MAj", "maj");
     ret = ret.replace("MAJ", "maj");
