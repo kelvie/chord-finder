@@ -6,6 +6,7 @@ use std::time::Duration;
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
 pub struct TemplateApp {
     chord: String,
+    chord_normalized: String,
 
     // Used as an LRU cache for the last played note -- the handles need to
     // exist for the sound to continue playing.
@@ -16,10 +17,12 @@ pub struct TemplateApp {
     selection: Vec<Note>,
 }
 
+const DEFAULT_CHORD: &str = "Cmaj7";
 impl Default for TemplateApp {
     fn default() -> Self {
         Self {
-            chord: "".to_owned(),
+            chord: DEFAULT_CHORD.to_owned(),
+            chord_normalized: fix_chord_name(DEFAULT_CHORD),
             playback_handles: Vec::new(),
             selection: Vec::new(),
         }
@@ -211,6 +214,9 @@ fn fix_chord_name(chord: &str) -> String {
         }
         last_was_slash = c == '/';
     }
+    // Change sharps/flats to the unicode symbol
+    ret = ret.replace("b", "♭");
+    ret = ret.replace("#", "♯");
 
     // convert Maj, MAj, etc, to lowercase (yes it's not exhaustive, but this is
     // meant to only catch common errors and adding the regex crate adds almost
@@ -320,7 +326,13 @@ impl eframe::App for TemplateApp {
                             )
                             .changed()
                         {
-                            self.chord = fix_chord_name(self.chord.as_str());
+                            self.chord_normalized = fix_chord_name(self.chord.as_str());
+                            // Remove this if instead of auto-correct we want to
+                            // just leave whatever the user typed in.
+                            //
+                            // TODO: make this an option? or print out what
+                            // we're parsing in the next box
+                            self.chord = self.chord_normalized.clone();
                         }
                     });
 
@@ -329,9 +341,11 @@ impl eframe::App for TemplateApp {
                     use klib::core::chord::Chord;
                     use klib::core::chord::HasChord;
 
+                    // TODO: accept comma or space separated chords
+                    // TODO: accept raw note input?
                     // parse the chord and show it
-                    let chord = Chord::parse(self.chord.as_str());
-                    if !self.chord.is_empty() {
+                    let chord = Chord::parse(self.chord_normalized.as_str());
+                    if !self.chord_normalized.is_empty() {
                         ui.add_space(15.0);
                         ui.separator();
                         ui.add_space(15.0);
