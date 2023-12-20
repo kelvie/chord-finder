@@ -326,6 +326,8 @@ impl eframe::App for TemplateApp {
                             )
                             .changed()
                         {
+                            // TODO: this fucks with autocorrect when this
+                            // actually changes the text
                             self.chord_normalized = fix_chord_name(self.chord.as_str());
                             // Remove this if instead of auto-correct we want to
                             // just leave whatever the user typed in.
