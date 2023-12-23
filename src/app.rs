@@ -1,4 +1,8 @@
+use egui::RichText;
+use egui::WidgetText;
 use klib::core::base::{Playable, PlaybackHandle};
+use klib::core::chord::{Chord, HasChord, HasScale};
+use klib::core::pitch::{HasPitch, Pitch};
 use std::time::Duration;
 
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
@@ -15,6 +19,28 @@ pub struct TemplateApp {
 
     #[serde(skip)]
     selection: Vec<Note>,
+
+    // Just to prevent recalculation each loop
+    #[serde(skip)]
+    c_scale: Vec<klib::core::pitch::Pitch>,
+
+    settings: Settings,
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(default)]
+pub struct Settings {
+    show_disabled_notes: bool,
+    default_disable_sharps: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            show_disabled_notes: false,
+            default_disable_sharps: false,
+        }
+    }
 }
 
 const DEFAULT_CHORD: &str = "Cmaj7";
@@ -25,6 +51,12 @@ impl Default for TemplateApp {
             chord_normalized: fix_chord_name(DEFAULT_CHORD),
             playback_handles: Vec::new(),
             selection: Vec::new(),
+            settings: Default::default(),
+            c_scale: Chord::new(klib::core::note::C)
+                .scale()
+                .iter()
+                .map(|n| n.pitch())
+                .collect(),
         }
     }
 }
@@ -114,24 +146,36 @@ fn playback_handle_add(handle: PlaybackHandle, handles: &mut Vec<PlaybackHandle>
     handles.push(handle);
 }
 
-fn note_button(
+fn note_button<'a>(
     note: Note,
     selected: bool,
     horizontal: bool,
-    playback_handles: &mut Vec<PlaybackHandle>,
-) -> impl egui::Widget + '_ {
+    settings: &'a Settings,
+    playback_handles: &'a mut Vec<PlaybackHandle>,
+) -> impl egui::Widget + 'a {
     move |ui: &mut egui::Ui| {
         // Scope is in case we want to do style changes for this button
         // specifically, e.g. to set something different if this button is
         // disabled.
         ui.scope(|ui| {
-            let note_name = match ui.is_enabled() {
-                true => format_note_name(note),
-                false => "".to_owned(),
+            let note_name: WidgetText = match ui.is_enabled() {
+                true => format_note_name(note).into(),
+                false => {
+                    if settings.show_disabled_notes {
+                        RichText::new(format_note_name(note)).weak().into()
+                    } else {
+                        RichText::new(" ").into()
+                    }
+                }
             };
 
             let label = egui::SelectableLabel::new(selected, note_name);
-            let response = ui.add_sized(BUTTON_SIZE, label);
+            let button_size = if horizontal {
+                [BUTTON_SIZE[1], BUTTON_SIZE[0]]
+            } else {
+                BUTTON_SIZE
+            };
+            let response = ui.add_sized(button_size, label);
             if response.clicked() {
                 let dur = Duration::from_millis(500);
                 // TODO: this crackles, just use the frequency and a different lib
@@ -149,7 +193,7 @@ fn note_button(
             }
 
             // Draw a line through the button if it's disabled, to help align frets
-            if !ui.is_enabled() {
+            if !settings.show_disabled_notes && !ui.is_enabled() {
                 let stroke = egui::Stroke::new(0.5, ui.visuals().widgets.inactive.fg_stroke.color);
                 const OFFSET: f32 = 15.0;
                 let points = if horizontal {
@@ -251,8 +295,16 @@ impl eframe::App for TemplateApp {
                     ui.add_space(16.0);
                 }
                 ui.menu_button("Settings", |ui| {
-                    // TODO: add settings
-                    ui.add_enabled(false, egui::Button::new("Coming soon"));
+                    // add a toggle for showing disabled notes
+                    ui.checkbox(&mut self.settings.show_disabled_notes, "Show all notes")
+                        .on_hover_text("Always show all notes, even if they're not in the chord");
+
+                    // add a toggle for defaulting to disabling sharps
+                    ui.checkbox(
+                        &mut self.settings.default_disable_sharps,
+                        "Disable sharps by default",
+                    )
+                    .on_hover_text("When no chord is entered, don't show the sharps");
                 });
 
                 // Align dark mode buttons buttons on the top right
@@ -311,8 +363,6 @@ impl eframe::App for TemplateApp {
                 style.spacing.item_spacing = egui::Vec2::new(0.0, 0.0);
 
                 // store chord pitches (need HasPitch to convert Note to Pitch)
-                use klib::core::pitch::HasPitch;
-                use klib::core::pitch::Pitch;
                 let mut chord_pitches: Vec<Pitch> = Vec::new();
 
                 ui.horizontal(|ui| {
@@ -340,8 +390,6 @@ impl eframe::App for TemplateApp {
 
                     // Add a text field for the user to enter a chord name
                     use klib::core::base::Parsable;
-                    use klib::core::chord::Chord;
-                    use klib::core::chord::HasChord;
 
                     // TODO: accept comma or space separated chords
                     // TODO: accept raw note input?
@@ -362,6 +410,7 @@ impl eframe::App for TemplateApp {
                                                     *note,
                                                     false,
                                                     true,
+                                                    &self.settings,
                                                     &mut self.playback_handles,
                                                 ));
                                             } else {
@@ -415,11 +464,23 @@ impl eframe::App for TemplateApp {
                     let mut fret_note_widget = |ui: &mut egui::Ui, string: Note, fret: usize| {
                         let note = note_for_fret(string, fret);
                         // enable only if chord pitches are empty or note is in the chord
-                        let enabled =
-                            chord_pitches.is_empty() || chord_pitches.contains(&note.pitch());
+
+                        let enabled = if !chord_pitches.is_empty() {
+                            chord_pitches.contains(&note.pitch())
+                        } else {
+                            !self.settings.default_disable_sharps
+                                || self.c_scale.contains(&note.pitch())
+                        };
+
                         ui.add_enabled(
                             enabled,
-                            note_button(note, false, horizontal, &mut self.playback_handles),
+                            note_button(
+                                note,
+                                false,
+                                horizontal,
+                                &self.settings,
+                                &mut self.playback_handles,
+                            ),
                         );
                     };
 
