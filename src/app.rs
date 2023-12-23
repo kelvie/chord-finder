@@ -1,7 +1,9 @@
 use egui::RichText;
 use egui::WidgetText;
+use klib::core::base::{HasName, HasStaticName};
 use klib::core::base::{Playable, PlaybackHandle};
 use klib::core::chord::{Chord, HasChord, HasScale};
+use klib::core::named_pitch::HasNamedPitch;
 use klib::core::pitch::{HasPitch, Pitch};
 use std::time::Duration;
 
@@ -32,6 +34,7 @@ pub struct TemplateApp {
 pub struct Settings {
     show_disabled_notes: bool,
     default_disable_sharps: bool,
+    hide_octaves: bool,
 }
 
 impl Default for Settings {
@@ -39,6 +42,7 @@ impl Default for Settings {
         Self {
             show_disabled_notes: false,
             default_disable_sharps: false,
+            hide_octaves: false,
         }
     }
 }
@@ -92,21 +96,26 @@ impl TemplateApp {
 }
 
 // Format a note for printing
-fn format_note_name(note: Note) -> String {
+fn format_note_name(note: Note, hide_octaves: bool) -> String {
     use klib::core::interval::Interval;
     use klib::core::note::ToUniversal;
 
     // Get universal note, which may be flat, but never sharp (or double flat/sharp)
     let mut unote = note.to_universal();
-    let note_name = unote.to_string();
+    let note_name = unote.name();
+
     // convert flats to sharps
     if note_name.contains('♭') {
         unote = unote + Interval::AugmentedSeventh - Interval::PerfectOctave;
     }
 
+    if hide_octaves {
+        return unote.named_pitch().static_name().to_owned();
+    }
+
     // Turn octave (well all numbers) into subscripts
     let mut s = String::new();
-    for c in unote.to_string().chars() {
+    for c in unote.name().chars() {
         s.push(match c {
             '0' => '₀',
             '1' => '₁',
@@ -158,11 +167,14 @@ fn note_button<'a>(
         // specifically, e.g. to set something different if this button is
         // disabled.
         ui.scope(|ui| {
+            let hide_octaves = settings.hide_octaves;
             let note_name: WidgetText = match ui.is_enabled() {
-                true => format_note_name(note).into(),
+                true => format_note_name(note, hide_octaves).into(),
                 false => {
                     if settings.show_disabled_notes {
-                        RichText::new(format_note_name(note)).weak().into()
+                        RichText::new(format_note_name(note, hide_octaves))
+                            .weak()
+                            .into()
                     } else {
                         RichText::new(" ").into()
                     }
@@ -305,6 +317,10 @@ impl eframe::App for TemplateApp {
                         "Disable sharps by default",
                     )
                     .on_hover_text("When no chord is entered, don't show the sharps");
+
+                    // add a toggle for hiding octaves
+                    ui.checkbox(&mut self.settings.hide_octaves, "Hide octaves")
+                        .on_hover_text("Hide the octave number in the note name");
                 });
 
                 // Align dark mode buttons buttons on the top right
@@ -417,7 +433,7 @@ impl eframe::App for TemplateApp {
                                                 use egui::widgets::Label;
                                                 ui.add_sized(
                                                     [0.0, BUTTON_SIZE[1]],
-                                                    Label::new(format_note_name(*note)),
+                                                    Label::new(format_note_name(*note, true)),
                                                 );
                                                 ui.add_space(8.0);
                                             }
